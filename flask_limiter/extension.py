@@ -12,6 +12,7 @@ from flask.ext.limiter.storage import storage_from_string
 from .strategies import STRATEGIES
 from .util import parse_many, get_ipaddr
 
+
 class C:
     ENABLED = "RATELIMIT_ENABLED"
     HEADERS_ENABLED = "RATELIMIT_HEADERS_ENABLED"
@@ -22,15 +23,18 @@ class C:
     HEADER_REMAINING = "RATELIMIT_HEADER_REMAINING"
     HEADER_RESET = "RATELIMIT_HEADER_RESET"
 
+
 class HEADERS:
     RESET = 1
     REMAINING = 2
     LIMIT = 3
 
+
 class ExtLimit(object):
     """
     simple wrapper to encapsulate limits and their context
     """
+
     def __init__(self, limit, key_func, scope, per_method):
         self._limit = limit
         self.key_func = key_func
@@ -44,6 +48,7 @@ class ExtLimit(object):
     @property
     def scope(self):
         return self._scope(request.endpoint) if callable(self._scope) else self._scope
+
 
 class Limiter(object):
     """
@@ -67,7 +72,7 @@ class Limiter(object):
                  , strategy=None
                  , storage_uri=None
                  , auto_check=True
-    ):
+                 ):
         self.app = app
         self.enabled = True
         self.global_limits = []
@@ -84,7 +89,7 @@ class Limiter(object):
                     ExtLimit(
                         limit, key_func, None, False
                     ) for limit in parse_many(limit)
-                ]
+                    ]
             )
         self.route_limits = {}
         self.dynamic_route_limits = {}
@@ -94,9 +99,11 @@ class Limiter(object):
         self.storage = self.limiter = None
         self.key_func = key_func
         self.logger = logging.getLogger("flask-limiter")
+
         class BlackHoleHandler(logging.StreamHandler):
             def emit(*_):
                 return
+
         self.logger.addHandler(BlackHoleHandler())
         if app:
             self.init_app(app)
@@ -122,9 +129,12 @@ class Limiter(object):
             raise ConfigurationError("Invalid rate limiting strategy %s" % strategy)
         self.limiter = STRATEGIES[strategy](self.storage)
         self.header_mapping.update({
-           HEADERS.RESET : self.header_mapping.get(HEADERS.RESET,None) or app.config.setdefault(C.HEADER_RESET, "X-RateLimit-Reset"),
-           HEADERS.REMAINING : self.header_mapping.get(HEADERS.REMAINING,None) or app.config.setdefault(C.HEADER_REMAINING, "X-RateLimit-Remaining"),
-           HEADERS.LIMIT : self.header_mapping.get(HEADERS.LIMIT,None) or app.config.setdefault(C.HEADER_LIMIT, "X-RateLimit-Limit"),
+            HEADERS.RESET: self.header_mapping.get(HEADERS.RESET, None) or app.config.setdefault(C.HEADER_RESET,
+                                                                                                 "X-RateLimit-Reset"),
+            HEADERS.REMAINING: self.header_mapping.get(HEADERS.REMAINING, None) or app.config.setdefault(
+                C.HEADER_REMAINING, "X-RateLimit-Remaining"),
+            HEADERS.LIMIT: self.header_mapping.get(HEADERS.LIMIT, None) or app.config.setdefault(C.HEADER_LIMIT,
+                                                                                                 "X-RateLimit-Limit"),
         })
 
         conf_limits = app.config.get(C.GLOBAL_LIMITS, None)
@@ -133,14 +143,14 @@ class Limiter(object):
                 ExtLimit(
                     limit, self.key_func, None, False
                 ) for limit in parse_many(conf_limits)
-            ]
+                ]
         if self.auto_check:
             app.before_request(self.__check_request_limit)
         app.after_request(self.__inject_headers)
 
         # purely for backward compatibility as stated in flask documentation
         if not hasattr(app, 'extensions'):
-            app.extensions = {} # pragma: no cover
+            app.extensions = {}  # pragma: no cover
         app.extensions['limiter'] = self
 
     def check(self):
@@ -173,16 +183,16 @@ class Limiter(object):
         endpoint = request.endpoint or ""
         view_func = current_app.view_functions.get(endpoint, None)
         name = ("%s.%s" % (
-                view_func.__module__, view_func.__name__
-            ) if view_func else ""
-        )
+            view_func.__module__, view_func.__name__
+        ) if view_func else ""
+                )
         if (not request.endpoint
             or not self.enabled
             or view_func == current_app.send_static_file
             or name in self.exempt_routes
             or request.blueprint in self.blueprint_exempt
             or any(fn() for fn in self.request_filters)
-        ):
+            ):
             return
         limits = (
             name in self.route_limits and self.route_limits[name]
@@ -205,7 +215,7 @@ class Limiter(object):
         if request.blueprint:
             if (request.blueprint in self.blueprint_dynamic_limits
                 and not dynamic_limits
-            ):
+                ):
                 for lim in self.blueprint_dynamic_limits[request.blueprint]:
                     try:
                         dynamic_limits.extend(
@@ -220,8 +230,8 @@ class Limiter(object):
                         )
             if (request.blueprint in self.blueprint_limits
                 and not limits
-            ):
-               limits.extend(self.blueprint_limits[request.blueprint])
+                ):
+                limits.extend(self.blueprint_limits[request.blueprint])
 
         failed_limit = None
         limit_for_header = None
@@ -279,6 +289,7 @@ class Limiter(object):
                 @wraps(obj)
                 def __inner(*a, **k):
                     return obj(*a, **k)
+
                 if dynamic_limit:
                     self.dynamic_route_limits.setdefault(name, []).append(
                         dynamic_limit
@@ -288,8 +299,8 @@ class Limiter(object):
                         static_limits
                     )
                 return __inner
-        return _inner
 
+        return _inner
 
     def limit(self, limit_value, key_func=None, per_method=False):
         """
@@ -305,7 +316,6 @@ class Limiter(object):
         """
         return self.__limit_decorator(limit_value, key_func, per_method=per_method)
 
-
     def shared_limit(self, limit_value, scope, key_func=None):
         """
         decorator to be applied to multiple routes sharing the same rate limit.
@@ -319,17 +329,17 @@ class Limiter(object):
         """
         return self.__limit_decorator(limit_value, key_func, True, scope)
 
-
-
     def exempt(self, obj):
         """
         decorator to mark a view or all views in a blueprint as exempt from rate limits.
         """
         if not isinstance(obj, Blueprint):
             name = "%s.%s" % (obj.__module__, obj.__name__)
+
             @wraps(obj)
             def __inner(*a, **k):
                 return obj(*a, **k)
+
             self.exempt_routes.add(name)
             return __inner
         else:
@@ -342,4 +352,3 @@ class Limiter(object):
         """
         self.request_filters.append(fn)
         return fn
-

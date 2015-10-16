@@ -5,11 +5,10 @@ from abc import abstractmethod, ABCMeta
 
 from six.moves import urllib
 
-
 try:
     from collections import Counter
-except ImportError: # pragma: no cover
-    from .backports.counter import Counter # pragma: no cover
+except ImportError:  # pragma: no cover
+    from .backports.counter import Counter  # pragma: no cover
 
 import threading
 import time
@@ -20,6 +19,7 @@ from .errors import ConfigurationError
 from .util import get_dependency
 
 SCHEMES = {}
+
 
 def storage_from_string(storage_string):
     """
@@ -32,11 +32,13 @@ def storage_from_string(storage_string):
         raise ConfigurationError("unknown storage scheme : %s" % storage_string)
     return SCHEMES[scheme](storage_string)
 
+
 class StorageRegistry(type):
     def __new__(mcs, name, bases, dct):
         storage_scheme = dct.get('STORAGE_SCHEME', None)
         if not bases == (object,) and not storage_scheme:
-            raise ConfigurationError("%s is not configured correctly, it must specify a STORAGE_SCHEME class attribute"  % name)
+            raise ConfigurationError(
+                "%s is not configured correctly, it must specify a STORAGE_SCHEME class attribute" % name)
         cls = super(StorageRegistry, mcs).__new__(mcs, name, bases, dct)
         SCHEMES[storage_scheme] = cls
         return cls
@@ -79,14 +81,14 @@ class Storage(object):
         raise NotImplementedError
 
 
-
-
 class LockableEntry(threading._RLock):
     __slots__ = ["atime", "expiry"]
+
     def __init__(self, expiry):
         self.atime = time.time()
         self.expiry = self.atime + expiry
         super(LockableEntry, self).__init__()
+
 
 class MemoryStorage(Storage):
     """
@@ -200,6 +202,7 @@ class MemoryStorage(Storage):
                 return int(item.atime), acquired
         return int(timestamp), acquired
 
+
 class RedisStorage(Storage):
     """
     rate limit storage with redis as backend
@@ -231,14 +234,14 @@ class RedisStorage(Storage):
          or if the redis host cannot be pinged.
         """
         if not get_dependency("redis"):
-            raise ConfigurationError("redis prerequisite not available") # pragma: no cover
+            raise ConfigurationError("redis prerequisite not available")  # pragma: no cover
         self.storage = get_dependency("redis").from_url(uri)
         self.initialize_storage(uri)
         super(RedisStorage, self).__init__()
 
     def initialize_storage(self, uri):
         if not self.storage.ping():
-            raise ConfigurationError("unable to connect to redis at %s" % uri) # pragma: no cover
+            raise ConfigurationError("unable to connect to redis at %s" % uri)  # pragma: no cover
         self.lua_moving_window = self.storage.register_script(
             RedisStorage.SCRIPT_MOVING_WINDOW
         )
@@ -304,6 +307,7 @@ class RedisStorage(Storage):
         """
         return int((self.storage.ttl(key) or 0) + time.time())
 
+
 class MemcachedStorage(Storage):
     """
     rate limit storage with memcached as backend
@@ -360,7 +364,7 @@ class MemcachedStorage(Storage):
                 value, cas = self.storage.gets(key)
                 retry = 0
                 while (
-                        not self.storage.cas(key, int(value or 0)+1, cas, expiry)
+                            not self.storage.cas(key, int(value or 0) + 1, cas, expiry)
                         and retry < self.MAX_CAS_RETRIES
                 ):
                     value, cas = self.storage.gets(key)
@@ -377,4 +381,3 @@ class MemcachedStorage(Storage):
         :param str key: the key to get the expiry for
         """
         return int(float(self.storage.get(key + "/expires") or time.time()))
-
